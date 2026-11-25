@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🗂️ DSH 会话管理与编辑工作台</title>
+  <link rel="stylesheet" href="/session-manager/app.css" />
+</head>
+<body>
+  <div id="app" class="layout">
+    <!-- 左侧：工作区与会话列表面板 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-row">
+          <span class="brand-title">🗂️ DSH 会话管理与编辑工作台</span>
+          <button id="btn-refresh-list" class="btn btn-ghost btn-sm" title="刷新列表">🔄 刷新</button>
+        </div>
+        <div id="global-stats" class="stats-bar">正在加载会话数据…</div>
+
+        <div class="filter-group">
+          <input id="search-input" type="search" class="input" placeholder="🔍 搜索会话标题 / ID / 目录…" />
+          <select id="workspace-filter" class="select">
+            <option value="__all__">📂 全部工作区（含孤儿会话）</option>
+          </select>
+        </div>
+
+        <div class="batch-bar">
+          <label class="checkbox-label">
+            <input type="checkbox" id="check-all" />
+            <span>全选当前</span>
+          </label>
+          <div class="batch-actions">
+            <button id="btn-clean-empty" class="btn btn-warn btn-xs" title="一键物理清理所有 0 轮空会话">🧹 清空会话</button>
+            <button id="btn-batch-delete" class="btn btn-danger btn-xs" disabled>🗑️ 彻底删除选中 (0)</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="session-list" class="session-list"></div>
+    </aside>
+
+    <!-- 右侧：会话内容查看、原地修改与物理文件管理 -->
+    <main class="detail-pane">
+      <div id="empty-state" class="empty-state">
+        <div class="empty-icon">🗂️</div>
+        <h2>选择左侧任意会话即可查看、修改内容或彻底物理删除</h2>
+        <p>支持原地无损修改用户消息、思考链与助手回复（不产生多余副本），删除任意回合，以及连同磁盘 <code>.jsonl.zstd</code>、投影缓存与孤儿附件一并彻底物理删除。</p>
+      </div>
+
+      <div id="session-detail" class="session-detail hidden">
+        <header class="detail-header">
+          <div class="title-edit-row">
+            <button id="btn-toggle-sidebar" class="btn btn-ghost btn-sm" title="展开/收起左侧列表">☰ 列表</button>
+            <input id="detail-title-input" type="text" class="input title-input" placeholder="输入会话标题…" />
+            <button id="btn-save-title" class="btn btn-primary btn-sm">💾 保存标题</button>
+            <button id="btn-reload-host" class="btn btn-secondary btn-sm" title="通知外层 DSH 刷新页面以同步展示最新修改后的对话">✨ 同步刷新主界面</button>
+            <button id="btn-delete-current" class="btn btn-danger btn-sm">🗑️ 彻底删除此会话及文件</button>
+          </div>
+          <div id="detail-meta" class="detail-meta"></div>
+        </header>
+
+        <div id="toast-banner" class="toast hidden"></div>
+
+        <section id="turns-container" class="turns-container"></section>
+
+        <footer class="append-section">
+          <details id="append-details">
+            <summary>➕ 在本会话末尾手动追加一轮对话（原地写入）</summary>
+            <div class="append-form">
+              <label>👤 用户消息内容（User）：</label>
+              <textarea id="append-user" class="textarea" rows="2" placeholder="输入用户侧话语…"></textarea>
+              <label>💭 助手思考块（Reasoning，选填）：</label>
+              <textarea id="append-reasoning" class="textarea" rows="2" placeholder="选填：内部思考内容…"></textarea>
+              <label>🎀 助手正式回复（Assistant）：</label>
+              <textarea id="append-assistant" class="textarea" rows="3" placeholder="输入助手回复正文…"></textarea>
+              <div class="append-actions">
+                <button id="btn-append-turn" class="btn btn-primary btn-sm">➕ 立即追加并原地保存</button>
+              </div>
+            </div>
+          </details>
+        </footer>
+      </div>
+    </main>
+  </div>
+
+  <!-- 自定义确认弹窗（避免 iframe sandbox 拦截原生 confirm） -->
+  <div id="modal-backdrop" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h3 id="modal-title">确认操作</h3>
+      <p id="modal-message"></p>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn btn-ghost">取消</button>
+        <button id="modal-confirm" class="btn btn-danger">确认执行</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/session-manager/app.js"></script>
+</body>
+</html>

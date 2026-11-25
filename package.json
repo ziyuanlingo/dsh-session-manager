@@ -1,0 +1,65 @@
+{
+  "name": "dsh-session-manager",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "In-place session message/reasoning editor, turn trimmer, and true physical session/storage cleaner for DeepSeek Harness (DSH v0.2.x / v4 zstd logs).",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "session-manager",
+    "message-edit",
+    "storage-cleaner",
+    "zstd"
+  ],
+  "author": "ZiyuanLingo Studio <founder@ziyuanlingo.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/ziyuanlingo/dsh-session-manager#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ziyuanlingo/dsh-session-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ziyuanlingo/dsh-session-manager/issues"
+  },
+  "main": "./index.mjs",
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./index.mjs",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "icon.svg",
+    "index.mjs",
+    "client.js",
+    "cordis.patch.yml",
+    "web",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check index.mjs && node --check client.js && node --check web/app.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "dsh": ">=0.1.0-0 <1.0.0"
+  }
+}
