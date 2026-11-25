@@ -228,25 +228,66 @@ async function unloadLiveSession(ctx, sessionId) {
 
     if (liveAgent) {
         try {
-            if (liveAgent.status === 'running')
-                liveAgent.cancel({ kind: 'user' });
+            if (liveAgent.status === 'running') {
+                liveAgent.cancel({ kind: 'disposed' });
+                await liveAgent.whenIdle?.();
+            }
         } catch { /* ignore */ }
-        try {
-            if (liveSession)
-                await ctx.sessions.flush(liveSession);
-        } catch { /* ignore */ }
-        try {
-            await liveAgent.scope?.dispose?.();
-        } catch { /* ignore */ }
-    } else if (liveSession) {
+    }
+    if (liveSession) {
         try { await ctx.sessions.flush(liveSession); } catch { /* ignore */ }
+    }
+
+    // Explicitly drain & close the active JSONL write handle so Windows SessionWriteLease is released
+    const tracker = persistence?.tracker;
+    const writer = tracker?.writers?.get?.(sessionId);
+    if (writer) {
+        try { await writer.drainLive?.(); } catch { /* ignore */ }
+        try { await writer.flush?.(); } catch { /* ignore */ }
+        try { await writer.close?.(); } catch { /* ignore */ }
+    }
+    if (tracker?.pending?.has?.(sessionId)) {
+        try { tracker.pending.delete(sessionId); } catch { /* ignore */ }
+        try { tracker.writers?.delete?.(sessionId); } catch { /* ignore */ }
+    }
+
+    if (liveAgent) {
+        try { await liveAgent.scope?.dispose?.(); } catch { /* ignore */ }
+    }
+
+    // Detach from AgentRegistry and SessionStore so in-memory stores do not retain stale state or throw "already exists"
+    const agentEntry = agentsSvc?.store?.get?.(sessionId);
+    if (agentEntry) {
+        try {
+            if (typeof agentsSvc.detachEntered === 'function')
+                agentsSvc.detachEntered(agentEntry);
+            else
+                agentsSvc.store.delete(sessionId);
+        } catch {
+            try { agentsSvc.store?.delete?.(sessionId); } catch { /* ignore */ }
+        }
+    }
+
+    const sessEntry = ctx.sessions?.store?.get?.(sessionId);
+    if (sessEntry) {
+        try {
+            if (typeof sessEntry.detach === 'function')
+                sessEntry.detach();
+            else if (typeof ctx.sessions.detachEntered === 'function')
+                ctx.sessions.detachEntered(sessEntry);
+            else
+                ctx.sessions.store.delete(sessionId);
+        } catch {
+            try { ctx.sessions.store?.delete?.(sessionId); } catch { /* ignore */ }
+        }
     }
 
     for (let attempt = 0; attempt < 25; attempt++) {
         const stillAgent = agentsSvc?.get?.(sessionId);
         const stillSession = ctx.sessions?.get?.(sessionId);
+        const stillWriter = tracker?.writers?.get?.(sessionId);
         const stillPending = persistence?.hasPendingSession?.(sessionId);
-        if (!stillAgent && !stillSession && !stillPending)
+        if (!stillAgent && !stillSession && !stillWriter && !stillPending)
             break;
         await new Promise(r => setTimeout(r, 40));
     }
@@ -378,23 +419,58 @@ function buildStructuredConversation(header, events) {
     };
 }
 
+function computeValidInheritedEventCount(header, prevInheritedCount, events) {
+    if (!header?.isSeeded)
+        return 0;
+    let lastInheritedMarkerIdx = -1;
+    for (let i = 0; i < events.length; i++) {
+        if (events[i]?.type === 'session/end-seed' && events[i]?.data?.inherited === true) {
+            lastInheritedMarkerIdx = i;
+        }
+    }
+    if (lastInheritedMarkerIdx >= 0)
+        return lastInheritedMarkerIdx;
+    return Math.min(prevInheritedCount ?? 0, events.length);
+}
+
+function ensureInheritedCutBeforeAppend(header, prevInheritedCount, events, now = Date.now()) {
+    if (!header?.isSeeded)
+        return;
+    const hasInheritedMarker = events.some(e => e?.type === 'session/end-seed' && e?.data?.inherited === true);
+    if (!hasInheritedMarker && (prevInheritedCount ?? 0) === events.length) {
+        events.push({
+            type: 'session/end-seed',
+            seq: events.length,
+            time: now,
+            data: { inherited: true },
+        });
+    }
+}
+
 async function commitRewrittenSessionInPlace(ctx, sessionId, header, inheritedEventCount, newEvents, resumeAfter = false) {
     const persistence = ctx.get?.('sessionPersistence');
     const projCache = ctx.get?.('sessionProjectionCache');
     const { sessionsRoot, projCacheDir, presetEnhanceStateFile } = resolveDataPaths(ctx);
 
-    const safeInherited = header.isSeeded ? Math.min(inheritedEventCount ?? 0, newEvents.length) : 0;
+    const safeInherited = computeValidInheritedEventCount(header, inheritedEventCount, newEvents);
     const cleanHeader = structuredClone(header);
-    if (cleanHeader.isSeeded) {
-        cleanHeader.seedLength = safeInherited;
-    }
+    delete cleanHeader.seedLength;
 
-    // 1. Validate against DSH's official Session replay & invariant engine BEFORE touching disk!
+    // 1. Validate against BOTH DSH's Session.create (snapshot) and Session.fromRestore (detached disk restore)
+    // using an isolated temporary ID so a live store entry never causes `session "..." already exists`!
     if (ctx.sessions?.prepare) {
-        ctx.sessions.prepare(sessionId, {
+        const validateId1 = `__sm_val_snap_${randomUUID()}`;
+        ctx.sessions.prepare(validateId1, {
             seed: structuredClone(newEvents),
-            meta: structuredClone(cleanHeader),
+            meta: { ...structuredClone(cleanHeader), id: validateId1 },
             inheritedEventCount: safeInherited,
+        });
+        const validateId2 = `__sm_val_rest_${randomUUID()}`;
+        ctx.sessions.prepare(validateId2, {
+            seed: structuredClone(newEvents),
+            meta: { ...structuredClone(cleanHeader), id: validateId2 },
+            inheritedEventCount: safeInherited,
+            eventState: 'detached',
         });
     }
 
@@ -476,9 +552,10 @@ async function commitRewrittenSessionInPlace(ctx, sessionId, header, inheritedEv
     try { await workspaceRegistry?.indexHeader?.(cleanHeader); } catch { /* ignore */ }
 
     if (resumeAfter) {
-        try {
-            await ctx.get?.('sessionController')?.resolveAgent?.(sessionId);
-        } catch { /* optional warm resume */ }
+        const resumed = await ctx.get?.('sessionController')?.resolveAgent?.(sessionId);
+        if (resumed && typeof resumed === 'object' && 'error' in resumed && resumed.error) {
+            throw resumed.error instanceof Error ? resumed.error : new Error(String(resumed.error));
+        }
     }
 }
 
@@ -621,6 +698,7 @@ async function permanentlyDeleteSessions(ctx, sessionIds) {
             if (obs?.entries instanceof Map)
                 obs.entries.delete(sessionId);
         } catch { /* ignore */ }
+        try { ctx.emit?.('api-session/removed', sessionId); } catch { /* ignore */ }
 
         totalFreedBytes += disk.totalBytes;
         details.push({
@@ -915,10 +993,12 @@ export function apply(ctx) {
                 const full = await readFullSessionLog(ctx, sessionId);
                 const wasLive = await unloadLiveSession(ctx, sessionId);
                 const newEvents = structuredClone(full.events);
+                const now = Date.now();
+                ensureInheritedCutBeforeAppend(full.header, full.inheritedEventCount, newEvents, now);
                 newEvents.push({
                     type: 'session/title',
                     seq: newEvents.length,
-                    time: Date.now(),
+                    time: now,
                     data: {
                         title,
                         messageSeqs: [],
@@ -1001,12 +1081,13 @@ export function apply(ctx) {
                 const full = await readFullSessionLog(ctx, sessionId);
                 const wasLive = await unloadLiveSession(ctx, sessionId);
                 const newEvents = structuredClone(full.events);
+                const now = Date.now();
+                ensureInheritedCutBeforeAppend(full.header, full.inheritedEventCount, newEvents, now);
                 const existingMaxTurn = newEvents.reduce((m, e) => e.type === 'turn/start' ? Math.max(m, e.data?.turn ?? 0) : m, 0);
                 const nextTurn = existingMaxTurn + 1;
                 const lastModelEv = [...newEvents].reverse().find(e => e.type === 'assistant/message');
                 const provider = lastModelEv?.data?.message?.source?.provider ?? 'vertex-direct';
                 const model = lastModelEv?.data?.message?.source?.model ?? 'gemini-4-carbon';
-                const now = Date.now();
 
                 const pushEv = (type, data, extra = {}) => {
                     newEvents.push({ type, seq: newEvents.length, time: now, data, ...extra });
@@ -1066,5 +1147,12 @@ export function apply(ctx) {
     );
 }
 
-export { decodeMultiFrameZstd, encodeZstdFrameFallback, removeTurnsAndResequence, collectAttachmentIdsFromEvents };
+export {
+    decodeMultiFrameZstd,
+    encodeZstdFrameFallback,
+    removeTurnsAndResequence,
+    collectAttachmentIdsFromEvents,
+    computeValidInheritedEventCount,
+    ensureInheritedCutBeforeAppend,
+};
 export default { name, inject, apply };

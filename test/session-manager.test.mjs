@@ -5,6 +5,8 @@ import {
   encodeZstdFrameFallback,
   removeTurnsAndResequence,
   collectAttachmentIdsFromEvents,
+  computeValidInheritedEventCount,
+  ensureInheritedCutBeforeAppend,
 } from '../index.mjs';
 
 test('multi-frame Zstandard encoder & decoder roundtrip', () => {
@@ -57,4 +59,30 @@ test('collectAttachmentIdsFromEvents extracts 64-hex SHA256 attachment reference
   ]);
   assert.equal(ids.has(sampleSha), true);
   assert.equal(ids.size, 1);
+});
+
+test('computeValidInheritedEventCount & ensureInheritedCutBeforeAppend preserve isSeeded invariants', () => {
+  const seededHeader = { version: 4, id: 's-fork', isSeeded: true };
+  const eventsWithTurnAndCut = [
+    { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
+    { type: 'turn/end', seq: 1, time: 2, data: { turn: 1, reason: { kind: 'completed' } } },
+    { type: 'session/end-seed', seq: 2, time: 3, data: { inherited: true } },
+    { type: 'agent-preset/selected', seq: 3, time: 4, data: { presetId: 'default' } },
+  ];
+
+  const trimmed = removeTurnsAndResequence(eventsWithTurnAndCut, new Set([1]));
+  assert.equal(trimmed.length, 2);
+  assert.equal(trimmed[0].type, 'session/end-seed');
+  assert.equal(computeValidInheritedEventCount(seededHeader, 2, trimmed), 0);
+
+  // When a freshly forked session has all events inherited (no end-seed marker yet) and we append:
+  const pureSeededEvents = [
+    { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
+    { type: 'turn/end', seq: 1, time: 2, data: { turn: 1, reason: { kind: 'completed' } } },
+  ];
+  ensureInheritedCutBeforeAppend(seededHeader, 2, pureSeededEvents, 99);
+  assert.equal(pureSeededEvents.length, 3);
+  assert.equal(pureSeededEvents[2].type, 'session/end-seed');
+  assert.deepEqual(pureSeededEvents[2].data, { inherited: true });
+  assert.equal(computeValidInheritedEventCount(seededHeader, 2, pureSeededEvents), 2);
 });

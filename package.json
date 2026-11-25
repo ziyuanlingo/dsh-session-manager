@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-manager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "In-place session message/reasoning editor, turn trimmer, and true physical session/storage cleaner for DeepSeek Harness (DSH v0.2.x / v4 zstd logs).",
   "keywords": [

@@ -23,7 +23,7 @@
 
 ### 1. 🗑️ 真正彻底的物理级删除（单删 / 多选批量删 / 一键清空 0 轮空会话）
 执行删除时，插件按严格顺序完成全链路清理：
-1. **安全停止并释放文件锁**：若目标会话正处于运行或内存挂载态，自动取消当前轮次并调用 `agent.scope.dispose()` 走宿主标准 `teardown()` 释放 `SessionWriteLease` 句柄；
+1. **安全停止并释放文件锁**：若目标会话正处于运行或内存挂载态，自动取消当前轮次、排空并关闭 `JsonlSessionHandle` 写句柄（释放 Windows/POSIX `SessionWriteLease` 锁），并从 `agents` 与 `sessions` 注册表中干净解绑；
 2. **工作区实时解绑（侧边栏即时消失）**：从 `workspaceRegistry` 所属工作区调用 `detachSession`、移除置顶（Pin）与归档（Archive）记录，自动触发 `domain/changed` 使前端左侧会话列表实时同步移除；
 3. **物理清除会话日志目录**：彻底删除 `data/dsh/sessions/<workspace-slug>/<sessionId>/` 文件夹及其内部的 `session.v4.jsonl.zstd` 多帧压缩日志（若父目录已空亦自动回收）；
 4. **清除投影与查询缓存**：删除 `data/dsh/storages/session_projcache/sessions/<sessionId>.json` 文件及内存投影表、`coldLogMemo` 与 `sessionQuery` 观察缓存；
@@ -38,7 +38,7 @@
 - **手动追加完整回合**：支持在会话末尾原地补写一轮自定义 `User + Reasoning (可选) + Assistant` 闭合回合。
 
 ### 3. 🛡️ 双重安全与耐久性保障
-- **落盘前官方契约重放预校验**：任何原地修改在接触磁盘前，均先传入宿主 `ctx.sessions.prepare()` 执行完整的 `v4` 事件流重放与状态机不变量验证；若结构不合法将直接拦截报错，绝不损坏现有日志文件；
+- **落盘前官方契约双模式重放预校验**：任何原地修改在接触磁盘前，均使用独立临时校验 ID 同时通过宿主 `Session.create`（内存快照）与 `Session.fromRestore`（`detached` 磁盘冷恢复）双重校验，并自动维护 `isSeeded: true` 分支继承会话的 `inheritedEventCount` 与 `session/end-seed` 游标对齐；若结构不合法将直接拦截报错，绝不损坏现有日志文件；
 - **多帧 Zstandard 原子替换**：优先调用宿主 `sessionPersistence.encodeMaterialization()`（内置双帧带校验和 Zstd 编码器兜底），先写入同目录临时文件完成 `fsync()`，再通过原子 `rename()` 覆盖目标 `session.v4.jsonl.zstd`。
 
 ---
