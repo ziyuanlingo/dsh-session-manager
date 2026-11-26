@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   decodeMultiFrameZstd,
   encodeZstdFrameFallback,
+  buildStructuredConversation,
   removeTurnsAndResequence,
   collectAttachmentIdsFromEvents,
   computeValidInheritedEventCount,
@@ -85,4 +86,84 @@ test('computeValidInheritedEventCount & ensureInheritedCutBeforeAppend preserve 
   assert.equal(pureSeededEvents[2].type, 'session/end-seed');
   assert.deepEqual(pureSeededEvents[2].data, { inherited: true });
   assert.equal(computeValidInheritedEventCount(seededHeader, 2, pureSeededEvents), 2);
+});
+
+test('buildStructuredConversation normalizes reasoning and thinking blocks across multi-turn tool sessions', () => {
+  const header = { version: 4, id: 's-multi', title: 'Multi-turn test' };
+  const events = [
+    { type: 'turn/start', seq: 0, time: 10, data: { turn: 1 } },
+    { type: 'user/message', seq: 1, time: 11, data: { content: [{ type: 'text', text: 'turn 1 prompt' }] } },
+    {
+      type: 'assistant/message',
+      seq: 2,
+      time: 12,
+      data: {
+        model: 'test-model',
+        message: {
+          content: [
+            { type: 'reasoning', text: 'turn 1 reasoning' },
+            { type: 'text', text: 'turn 1 reply' },
+          ],
+        },
+      },
+    },
+    { type: 'turn/end', seq: 3, time: 13, data: { turn: 1, reason: { kind: 'completed' } } },
+    { type: 'turn/start', seq: 4, time: 20, data: { turn: 2 } },
+    { type: 'user/message', seq: 5, time: 21, data: { content: [{ type: 'text', text: 'turn 2 prompt' }] } },
+    {
+      type: 'assistant/message',
+      seq: 6,
+      time: 22,
+      data: {
+        model: 'vertex/very-long-model-name-stream',
+        message: {
+          content: [
+            { type: 'thinking', thinking: 'turn 2 native thinking block' },
+            { type: 'tool-call', toolName: 'read_file' },
+            { type: 'text', text: '' },
+          ],
+        },
+      },
+    },
+    {
+      type: 'assistant/message',
+      seq: 7,
+      time: 23,
+      data: {
+        model: 'vertex/very-long-model-name-stream',
+        message: {
+          content: [
+            { type: 'thinking', text: 'turn 2 text-field thinking' },
+            { type: 'text', text: 'turn 2 final answer' },
+          ],
+        },
+      },
+    },
+    { type: 'turn/end', seq: 8, time: 24, data: { turn: 2, reason: { kind: 'completed' } } },
+  ];
+
+  const conv = buildStructuredConversation(header, events);
+  assert.equal(conv.turns.length, 2);
+
+  const turn2 = conv.turns[1];
+  assert.equal(turn2.turn, 2);
+  assert.equal(turn2.toolCallsCount, 1);
+  assert.equal(turn2.items.length, 3);
+
+  const step1Blocks = turn2.items[1].blocks;
+  assert.equal(step1Blocks[0].type, 'reasoning');
+  assert.equal(step1Blocks[0].rawType, 'thinking');
+  assert.equal(step1Blocks[0].text, 'turn 2 native thinking block');
+  assert.equal(step1Blocks[0].editable, true);
+  assert.equal(step1Blocks[1].type, 'tool_use');
+  assert.equal(step1Blocks[1].toolName, 'read_file');
+  assert.equal(step1Blocks[2].type, 'text');
+  assert.equal(step1Blocks[2].editable, true);
+
+  const step2Blocks = turn2.items[2].blocks;
+  assert.equal(step2Blocks[0].type, 'reasoning');
+  assert.equal(step2Blocks[0].rawType, 'thinking');
+  assert.equal(step2Blocks[0].text, 'turn 2 text-field thinking');
+  assert.equal(step2Blocks[1].type, 'text');
+  assert.equal(step2Blocks[1].text, 'turn 2 final answer');
 });

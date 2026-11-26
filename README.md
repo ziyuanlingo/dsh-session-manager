@@ -32,7 +32,8 @@
 
 ### 2. ✏️ 真正原地无损修改会话内容（零副本垃圾）
 所有编辑均直接作用于**原会话 ID**，保持工作区位置、工具调用上下文与预设绑定不变：
-- **原地修改任意消息块**：直接展开编辑任意回合的 **👤 用户输入（`user/message`）**、**💭 思考链（`assistant.reasoning`）** 或 **🎀 助手正文回复（`assistant.text`）**；
+- **原地修改任意消息块**：直接展开编辑任意回合的 **👤 用户输入（`user/message`）**、**💭 思考链（`assistant.reasoning` / `assistant.thinking`，无损保留原字段格式写回）** 或 **🎀 助手正文回复（`assistant.text`）**；支持点击右上角 **「✏️ 原地编辑」** 或直接**双击消息正文**进入编辑态；
+- **多轮长会话快速跳转与完整滚动**：顶部新增 **⚡ 轮次直达导航胶囊**（`第 1 轮 / 第 2 轮 / ...`，带工具调用次数标记），一键平滑定位至任意中间回合；修复多轮长会话在窄屏或嵌入式 iframe 中的 Flexbox 压缩裁剪问题，确保每一轮的用户输入、思维链与助手回复均完整可见、按钮不被长模型名挤压；
 - **原地删除指定回合 / 向后截断**：支持单轮移除（如剔除因网络/配额报错的废轮次）或从指定回合起向后截断；自动成对剥离前置 `agent/inbox/spliced` 收件箱投递事件，并将保留事件重排为连续的 `seq = 0..N-1` 与 `turn = 1..K`，同步修正 `messageSeqs` / `sourceEventSeqs` 引用；
 - **原地修改会话标题**：直接改写或追加 `session/title` 事件并同步 `sessionTitle` 服务；
 - **手动追加完整回合**：支持在会话末尾原地补写一轮自定义 `User + Reasoning (可选) + Assistant` 闭合回合。
@@ -89,7 +90,8 @@ dsh plugin --profile web add github:ziyuanlingo/dsh-session-manager
 
 2. **单会话快速编辑（对话窗口顶部标签栏）**：
    - 在任意对话界面顶部点击 **「会话编辑/删除」** 标签页（位于「对话 / 轨迹」右侧），自动加载当前会话的全部回合；
-   - 点击任意消息块右上角的 **「✏️ 原地编辑」** 修改文本并点击 **「💾 原地保存修改」**；
+   - 在多轮长会话中，可点击顶部的 **「⚡ 轮次直达」** 胶囊一键平滑跳转到任意回合（如夹在中间的第 2 轮、第 10 轮）；
+   - 点击任意消息块右上角的 **「✏️ 原地编辑」** 或直接**双击消息正文**修改文本并点击 **「💾 原地保存修改」**；
    - 点击回合标题栏右侧的 **「✂️ 删除本轮」** 或 **「⏭️ 从第 N 轮起向后截断」** 即可裁剪历史；
    - 修改完成后，点击右上角 **「✨ 同步刷新主界面」** 即可在主对话视图中立即查看更新后的内容。
 
@@ -109,6 +111,16 @@ dsh plugin --profile web add github:ziyuanlingo/dsh-session-manager
 | `POST` | `/session-manager/api/delete-turns` | 原地移除指定回合数组并自动重排序号（`{ sessionId, turns: number[] }`） |
 | `POST` | `/session-manager/api/append-turn` | 在会话末尾原地追加一轮完整对话（`{ sessionId, userText, reasoningText?, assistantText }`） |
 | `POST` | `/session-manager/api/delete-sessions` | 彻底物理删除一个或多个会话及全部关联文件（`{ sessionIds: string[] }`） |
+
+---
+
+## 更新日志 | Changelog
+
+### `v1.0.2`
+- **修复多轮对话中间回合思维链与 AI 回复被裁剪、点不到的问题**：为 `.turn-card` 与所有弹性容器补齐 `flex-shrink: 0` 与 `min-height: 0` 滚动链，改用 `overflow: visible` 避免三轮及以上长会话被 Flexbox 压扁吞没；同步优化外层 `client.js` 宿主与 `iframe` 的弹性高度布局，移除固定 `minHeight: 640px` 硬编码。
+- **修复窄屏/超长模型名挤压编辑按钮**：为 `.msg-block-head` 与 `.turn-card-header` 启用自适应换行与防挤压保护，确保「✏️ 原地编辑」「✂️ 删除本轮」「⏭️ 截断」按钮始终完整可点击。
+- **多轮长会话快速跳转与双击编辑**：新增顶部 **⚡ 轮次直达导航栏**，点击胶囊即可平滑滚动并高亮对应回合；支持直接双击任意消息正文进入编辑态，打开编辑器时自动滚入可视区域；优化工具调用伴生空文本块的紧凑展示。
+- **兼容 `thinking` 思考块与更安全的接口校验**：`buildStructuredConversation` 与 `/api/edit-message` 兼容解析并无损写回 `thinking` 块（保留原始 `.thinking` / `.text` 字段结构）；`/api/edit-message` 改为先校验目标事件与消息块合法性后再卸载活跃会话，避免非法参数误触发卸载。
 
 ---
 

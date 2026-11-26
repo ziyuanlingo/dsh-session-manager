@@ -32,6 +32,7 @@ const els = {
   btnReloadHost: document.getElementById('btn-reload-host'),
   btnDeleteCurrent: document.getElementById('btn-delete-current'),
   detailMeta: document.getElementById('detail-meta'),
+  turnNavBar: document.getElementById('turn-nav-bar'),
   toastBanner: document.getElementById('toast-banner'),
   turnsContainer: document.getElementById('turns-container'),
   appendDetails: document.getElementById('append-details'),
@@ -181,7 +182,7 @@ function renderSessionList() {
     empty.style.padding = '20px';
     empty.style.textAlign = 'center';
     empty.style.color = 'var(--text-muted)';
-    empty.textContent = '当前筛选条件下没有会话。';
+    empty.textContent = '当前筛选条件下没有会话哦～';
     els.sessionList.appendChild(empty);
     updateBatchControls();
     return;
@@ -318,8 +319,14 @@ function renderSessionDetail(detail) {
   }
 
   els.turnsContainer.innerHTML = '';
+  if (els.turnNavBar) {
+    els.turnNavBar.innerHTML = '';
+  }
   const turns = detail.turns || [];
   if (turns.length === 0) {
+    if (els.turnNavBar) {
+      els.turnNavBar.classList.add('hidden');
+    }
     const emptyTurn = document.createElement('div');
     emptyTurn.style.padding = '28px';
     emptyTurn.style.textAlign = 'center';
@@ -329,10 +336,38 @@ function renderSessionDetail(detail) {
     return;
   }
 
+  if (els.turnNavBar) {
+    els.turnNavBar.classList.remove('hidden');
+    const navLabel = document.createElement('span');
+    navLabel.className = 'turn-nav-label';
+    navLabel.textContent = `⚡ 轮次直达 (${turns.length}轮)：`;
+    els.turnNavBar.appendChild(navLabel);
+    for (const t of turns) {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'turn-nav-pill';
+      pill.textContent = t.toolCallsCount > 0 ? `第 ${t.turn} 轮 · 🔧${t.toolCallsCount}` : `第 ${t.turn} 轮`;
+      pill.onclick = () => {
+        const target = document.getElementById(`turn-card-${t.turn}`);
+        if (!target) return;
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.classList.remove('highlight-jump');
+        void target.offsetWidth;
+        target.classList.add('highlight-jump');
+        setTimeout(() => target.classList.remove('highlight-jump'), 1200);
+      };
+      els.turnNavBar.appendChild(pill);
+    }
+  }
+
+  const inlineThinkingRe = /<(?:thinking|[a-z0-9_-]*thinking)>/i;
+
   for (let tIdx = 0; tIdx < turns.length; tIdx++) {
     const t = turns[tIdx];
     const card = document.createElement('div');
     card.className = 'turn-card';
+    card.id = `turn-card-${t.turn}`;
+    card.dataset.turn = String(t.turn);
 
     const head = document.createElement('div');
     head.className = 'turn-card-header';
@@ -362,6 +397,7 @@ function renderSessionDetail(detail) {
     tActions.className = 'turn-actions';
 
     const btnDelTurn = document.createElement('button');
+    btnDelTurn.type = 'button';
     btnDelTurn.className = 'btn btn-ghost btn-xs';
     btnDelTurn.textContent = '✂️ 删除本轮';
     btnDelTurn.onclick = async () => {
@@ -385,6 +421,7 @@ function renderSessionDetail(detail) {
     if (tIdx < turns.length - 1) {
       const laterTurns = turns.slice(tIdx).map(x => x.turn);
       const btnTrunc = document.createElement('button');
+      btnTrunc.type = 'button';
       btnTrunc.className = 'btn btn-ghost btn-xs';
       btnTrunc.textContent = `⏭️ 从第 ${t.turn} 轮起向后截断 (${laterTurns.length}轮)`;
       btnTrunc.onclick = async () => {
@@ -422,32 +459,50 @@ function renderSessionDetail(detail) {
 
       for (const b of item.blocks) {
         if (!b.editable) continue;
+        const isReasoning = b.type === 'reasoning' || b.type === 'thinking';
+        const isToolEmptyText = toolPills.length > 0 && item.role === 'assistant' && !isReasoning && !(b.text || '').trim();
         const msgBox = document.createElement('div');
-        const kindClass = item.role === 'user' ? 'role-user' : (b.type === 'reasoning' ? 'role-reasoning' : 'role-assistant');
-        msgBox.className = 'msg-block ' + kindClass;
+        const kindClass = item.role === 'user' ? 'role-user' : (isReasoning ? 'role-reasoning' : 'role-assistant');
+        msgBox.className = 'msg-block ' + kindClass + (isToolEmptyText ? ' compact-empty' : '');
+        msgBox.dataset.eventSeq = String(item.eventSeq);
+        msgBox.dataset.blockIndex = String(b.blockIndex);
 
         const mHead = document.createElement('div');
         mHead.className = 'msg-block-head';
 
         const roleTag = document.createElement('span');
         roleTag.className = 'msg-role-tag';
-        if (item.role === 'user') {
-          roleTag.textContent = `👤 用户输入 (seq=${item.eventSeq})`;
-        } else if (b.type === 'reasoning') {
-          roleTag.textContent = `💭 思考链 Reasoning (${item.model || 'assistant'} · seq=${item.eventSeq})`;
-        } else {
-          roleTag.textContent = `🎀 助手正文回复 (${item.model || 'assistant'} · seq=${item.eventSeq})`;
-        }
+        const updateRoleTag = () => {
+          if (item.role === 'user') {
+            roleTag.textContent = `👤 用户输入 (seq=${item.eventSeq})`;
+          } else if (isReasoning) {
+            roleTag.textContent = `💭 思考链 Reasoning (${item.model || 'assistant'} · seq=${item.eventSeq})`;
+          } else {
+            const inlineNote = inlineThinkingRe.test(b.text || '') ? ' · 含内嵌思考' : '';
+            roleTag.textContent = `🎀 助手正文回复 (${item.model || 'assistant'} · seq=${item.eventSeq}${inlineNote})`;
+          }
+        };
+        updateRoleTag();
 
         const btnEdit = document.createElement('button');
+        btnEdit.type = 'button';
         btnEdit.className = 'btn btn-ghost btn-xs';
         btnEdit.textContent = '✏️ 原地编辑';
 
         mHead.append(roleTag, btnEdit);
 
+        const formatViewText = (val) => {
+          if (val) return val;
+          if (toolPills.length > 0 && item.role === 'assistant' && !isReasoning) {
+            return '（工具步骤空文本，可按需编辑）';
+          }
+          return '（空内容）';
+        };
+
         const textView = document.createElement('div');
         textView.className = 'msg-text-view';
-        textView.textContent = b.text || '（空内容）';
+        textView.title = '双击文本或点击右上角「✏️ 原地编辑」即可修改';
+        textView.textContent = formatViewText(b.text);
 
         const editorBox = document.createElement('div');
         editorBox.className = 'msg-editor-box hidden';
@@ -460,20 +515,26 @@ function renderSessionDetail(detail) {
         edActions.className = 'msg-editor-actions';
 
         const btnCancel = document.createElement('button');
+        btnCancel.type = 'button';
         btnCancel.className = 'btn btn-ghost btn-sm';
         btnCancel.textContent = '取消';
 
         const btnSave = document.createElement('button');
+        btnSave.type = 'button';
         btnSave.className = 'btn btn-primary btn-sm';
         btnSave.textContent = '💾 原地保存修改';
 
-        btnEdit.onclick = () => {
+        const openEditor = () => {
           textarea.value = b.text;
           textView.classList.add('hidden');
           btnEdit.classList.add('hidden');
           editorBox.classList.remove('hidden');
+          msgBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           textarea.focus();
         };
+
+        btnEdit.onclick = openEditor;
+        textView.ondblclick = openEditor;
 
         btnCancel.onclick = () => {
           editorBox.classList.add('hidden');
@@ -492,7 +553,10 @@ function renderSessionDetail(detail) {
               text: textarea.value,
             });
             b.text = textarea.value;
-            textView.textContent = b.text || '（空内容）';
+            textView.textContent = formatViewText(b.text);
+            updateRoleTag();
+            const nowEmptyToolText = toolPills.length > 0 && item.role === 'assistant' && !isReasoning && !(b.text || '').trim();
+            msgBox.classList.toggle('compact-empty', nowEmptyToolText);
             editorBox.classList.add('hidden');
             textView.classList.remove('hidden');
             btnEdit.classList.remove('hidden');

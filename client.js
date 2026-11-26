@@ -5,7 +5,24 @@ window.__ModuleLoader__.load({
         const LOCK_STYLE_ATTR = 'data-session-manager-resize-lock';
         const LOCK_STATE_KEY = '__dshSessionManagerResizeLock';
         const PANEL_ID = 'dsh-session-manager-panel';
-        const FRAME_STYLE = { width: '100%', height: '100%', minHeight: '640px', border: 0 };
+        const FRAME_STYLE = {
+            width: '100%',
+            height: '100%',
+            flex: '1 1 auto',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            border: 0,
+        };
+        const IFRAME_STYLE = {
+            width: '100%',
+            height: '100%',
+            flex: '1 1 auto',
+            minHeight: 0,
+            border: 0,
+            display: 'block',
+        };
 
         function lockState() {
             const host = window;
@@ -80,7 +97,7 @@ window.__ModuleLoader__.load({
                 React.createElement('iframe', {
                     title: '会话全权管家',
                     src,
-                    style: { width: '100%', height: '100%', minHeight: '640px', border: 0, display: 'block' },
+                    style: IFRAME_STYLE,
                 })
             );
         }

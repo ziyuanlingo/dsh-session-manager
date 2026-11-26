@@ -86,6 +86,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .brand-row {
@@ -153,6 +154,7 @@ html, body {
 
 .session-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px;
   display: flex;
@@ -169,6 +171,7 @@ html, body {
   border: 1px solid var(--border);
   background: var(--bg-card);
   cursor: pointer;
+  flex-shrink: 0;
   transition: background 0.12s, border-color 0.12s;
 }
 
@@ -245,6 +248,7 @@ html, body {
 .detail-pane {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -270,6 +274,8 @@ html, body {
 .session-detail {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   height: 100%;
   overflow: hidden;
 }
@@ -281,6 +287,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .title-edit-row {
@@ -323,48 +330,112 @@ html, body {
   background: rgba(47, 179, 125, 0.15);
   border: 1px solid var(--success);
   color: var(--text-main);
+  flex-shrink: 0;
 }
 .toast.error {
   background: rgba(229, 77, 96, 0.16);
   border-color: var(--danger);
 }
 
+.turn-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.turn-nav-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.turn-nav-pill {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-main);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.turn-nav-pill:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
 .turns-container {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  scroll-behavior: smooth;
 }
 
 .turn-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  overflow: hidden;
+  overflow: visible;
+  flex-shrink: 0;
+  transition: box-shadow 0.25s, border-color 0.25s;
+}
+
+.turn-card.highlight-jump {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(236, 106, 160, 0.28);
 }
 
 .turn-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
   padding: 8px 12px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
+  border-radius: 9px 9px 0 0;
   font-size: 12.5px;
+  flex-shrink: 0;
 }
 
 .turn-title {
   font-weight: 700;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .turn-actions {
   display: flex;
   gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.turn-actions .btn,
+.msg-block-head .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  position: relative;
+  z-index: 2;
 }
 
 .turn-body {
@@ -372,6 +443,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .msg-block {
@@ -379,6 +451,21 @@ html, body {
   border-radius: 8px;
   padding: 9px 11px;
   background: var(--bg-input);
+  flex-shrink: 0;
+}
+
+.msg-block.compact-empty {
+  padding: 6px 11px;
+  opacity: 0.78;
+}
+
+.msg-block.compact-empty .msg-block-head {
+  margin-bottom: 2px;
+}
+
+.msg-block.compact-empty .msg-text-view {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .msg-block.role-user {
@@ -398,6 +485,9 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
   margin-bottom: 6px;
   font-size: 12px;
   color: var(--text-muted);
@@ -406,6 +496,9 @@ html, body {
 .msg-role-tag {
   font-weight: 600;
   color: var(--text-main);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .msg-text-view {
@@ -415,6 +508,14 @@ html, body {
   max-height: 320px;
   overflow-y: auto;
   font-size: 13px;
+  cursor: text;
+  border-radius: 5px;
+  padding: 2px 3px;
+  transition: background 0.12s;
+}
+
+.msg-text-view:hover {
+  background: rgba(127, 140, 175, 0.08);
 }
 
 .msg-editor-box {
@@ -450,6 +551,7 @@ html, body {
   border-top: 1px solid var(--border);
   background: var(--bg-panel);
   padding: 8px 16px;
+  flex-shrink: 0;
 }
 
 .append-section summary {
@@ -465,6 +567,8 @@ html, body {
   flex-direction: column;
   gap: 6px;
   padding-top: 8px;
+  max-height: 45vh;
+  overflow-y: auto;
 }
 
 .append-form label {

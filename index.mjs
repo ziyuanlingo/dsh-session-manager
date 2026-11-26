@@ -381,11 +381,16 @@ function buildStructuredConversation(header, events) {
             const blocks = [];
             let toolUsesInMsg = 0;
             content.forEach((b, idx) => {
-                if (b?.type === 'reasoning' || b?.type === 'text') {
+                if (b?.type === 'reasoning' || b?.type === 'thinking' || b?.type === 'text') {
+                    const normalizedType = b.type === 'thinking' ? 'reasoning' : b.type;
+                    const textVal = typeof b.text === 'string'
+                        ? b.text
+                        : (typeof b.thinking === 'string' ? b.thinking : '');
                     blocks.push({
                         blockIndex: idx,
-                        type: b.type,
-                        text: typeof b.text === 'string' ? b.text : '',
+                        type: normalizedType,
+                        rawType: b.type,
+                        text: textVal,
                         editable: true,
                     });
                 } else if (b?.type === 'tool-call' || b?.type === 'tool_use' || b?.type === 'toolCall') {
@@ -1020,7 +1025,6 @@ export function apply(ctx) {
                 }
 
                 const full = await readFullSessionLog(ctx, sessionId);
-                const wasLive = await unloadLiveSession(ctx, sessionId);
                 const newEvents = structuredClone(full.events);
                 const targetEv = newEvents.find(e => e.seq === eventSeq);
                 if (!targetEv) {
@@ -1034,9 +1038,13 @@ export function apply(ctx) {
                     block.text = newText;
                 } else if (targetEv.type === 'assistant/message') {
                     const block = targetEv.data?.message?.content?.[blockIndex];
-                    if (!block || (block.type !== 'text' && block.type !== 'reasoning'))
+                    if (!block || (block.type !== 'text' && block.type !== 'reasoning' && block.type !== 'thinking'))
                         return respondJson(res, 400, { error: '目标助手消息块不是文本或思考块' });
-                    block.text = newText;
+                    if (block.type === 'thinking' && typeof block.thinking === 'string' && typeof block.text !== 'string') {
+                        block.thinking = newText;
+                    } else {
+                        block.text = newText;
+                    }
                     if (Array.isArray(targetEv.data.stream)) {
                         targetEv.data.stream = [];
                     }
@@ -1044,6 +1052,7 @@ export function apply(ctx) {
                     return respondJson(res, 400, { error: `事件类型 ${targetEv.type} 不支持直接编辑文本` });
                 }
 
+                const wasLive = await unloadLiveSession(ctx, sessionId);
                 await commitRewrittenSessionInPlace(ctx, sessionId, full.header, full.inheritedEventCount, newEvents, wasLive);
                 return respondJson(res, 200, { ok: true, sessionId, eventSeq, blockIndex });
             }
@@ -1150,6 +1159,7 @@ export function apply(ctx) {
 export {
     decodeMultiFrameZstd,
     encodeZstdFrameFallback,
+    buildStructuredConversation,
     removeTurnsAndResequence,
     collectAttachmentIdsFromEvents,
     computeValidInheritedEventCount,
