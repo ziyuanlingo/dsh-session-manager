@@ -1,8 +1,8 @@
 {
   "name": "dsh-session-manager",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
-  "description": "In-place session message/reasoning editor, turn trimmer, and true physical session/storage cleaner for DeepSeek Harness (DSH v0.2.x / v4 zstd logs).",
+  "description": "In-place session message/reasoning editor, turn trimmer, and true physical session/storage cleaner for DeepSeek Harness (DSH v0.2.x / v4 zstd logs) with trilingual EN/ZH/JA Web UI.",
   "keywords": [
     "deepseek-harness",
     "dsh",
@@ -10,9 +10,10 @@
     "session-manager",
     "message-edit",
     "storage-cleaner",
-    "zstd"
+    "zstd",
+    "i18n"
   ],
-  "author": "ZiyuanLingo Studio <founder@ziyuanlingo.com>",
+  "author": "Nagamori Madokawa <founder@ziyuanlingo.com>",
   "license": "MIT",
   "homepage": "https://github.com/ziyuanlingo/dsh-session-manager#readme",
   "repository": {
@@ -38,11 +39,13 @@
     "cordis.patch.yml",
     "web",
     "README.md",
+    "README.zh-CN.md",
+    "README.ja.md",
     "LICENSE"
   ],
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check index.mjs && node --check client.js && node --check web/app.js"
+    "check": "node --check index.mjs && node --check client.js && node --check web/app.js && node --check test/session-manager.test.mjs"
   },
   "dsh": {
     "bundle": {

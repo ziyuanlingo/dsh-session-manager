@@ -888,16 +888,16 @@ async function listAllSessionsSummary(ctx) {
                         updatedAt,
                     });
                 } catch {
-                    title = snapTitle || '（日志待修复或空会话）';
+                    title = snapTitle || '';
                 }
             }
         }
 
         items.push({
             sessionId,
-            title: title || '（未命名空会话）',
+            title: title || '',
             workspaceId: ws?.id ?? '__orphan__',
-            workspaceTitle: ws?.title ?? '未归属孤儿会话',
+            workspaceTitle: ws?.title ?? '',
             cwd: header?.cwd ?? ws?.path ?? '',
             agentPreset: header?.agentPreset ?? '',
             createdAt: header?.createdAt ?? 0,

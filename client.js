@@ -5,6 +5,36 @@ window.__ModuleLoader__.load({
         const LOCK_STYLE_ATTR = 'data-session-manager-resize-lock';
         const LOCK_STATE_KEY = '__dshSessionManagerResizeLock';
         const PANEL_ID = 'dsh-session-manager-panel';
+        const LANG_STORAGE_KEY = 'dsh_i18n_lang';
+
+        const LABELS = {
+            en: {
+                tab: 'Session Editor',
+                sidebar: 'Session Manager',
+                iframeTitle: 'DSH Session Manager & In-Place Editor',
+            },
+            'zh-CN': {
+                tab: '会话编辑/删除',
+                sidebar: '会话全权管家',
+                iframeTitle: 'DSH 会话管理与原地编辑工作台',
+            },
+            ja: {
+                tab: 'セッション編集・削除',
+                sidebar: 'セッション管理',
+                iframeTitle: 'DSH セッション管理＆インプレース編集ワークベンチ',
+            },
+        };
+
+        function resolveInitialLang() {
+            try {
+                const saved = window.localStorage?.getItem(LANG_STORAGE_KEY);
+                if (saved && Object.prototype.hasOwnProperty.call(LABELS, saved)) {
+                    return saved;
+                }
+            } catch { /* ignore storage errors */ }
+            return 'en';
+        }
+
         const FRAME_STYLE = {
             width: '100%',
             height: '100%',
@@ -76,7 +106,9 @@ window.__ModuleLoader__.load({
 
         function ManagerEmbed({ sessionId = '', viewKind = 'main' }) {
             useDshResizeLock();
+            const [lang, setLang] = React.useState(resolveInitialLang);
             const src = buildSrc(sessionId, viewKind);
+
             React.useEffect(() => {
                 const onMessage = (event) => {
                     if (event.origin !== window.location.origin)
@@ -86,16 +118,20 @@ window.__ModuleLoader__.load({
                         return;
                     if (data.type === 'session-manager:reload-host') {
                         window.location.reload();
+                    } else if (data.type === 'dsh-i18n-lang' && Object.prototype.hasOwnProperty.call(LABELS, data.lang)) {
+                        setLang(data.lang);
                     }
                 };
                 window.addEventListener('message', onMessage);
                 return () => window.removeEventListener('message', onMessage);
             }, []);
+
+            const dict = LABELS[lang] || LABELS.en;
             return React.createElement(
                 'div',
                 { style: FRAME_STYLE, 'data-session-manager-frame-host': '' },
                 React.createElement('iframe', {
-                    title: '会话全权管家',
+                    title: dict.iframeTitle,
                     src,
                     style: IFRAME_STYLE,
                 })
@@ -137,11 +173,13 @@ window.__ModuleLoader__.load({
         return {
             inject: ['slots', 'conversation'],
             apply(ctx) {
+                const initialDict = LABELS[resolveInitialLang()] || LABELS.en;
+
                 ctx.slots.inject('conversation.view', () => ctx.slots.register({
                     name: 'conversation.view',
                     id: PANEL_ID,
                     order: 28,
-                    label: '会话编辑/删除',
+                    label: initialDict.tab,
                 }, ConversationTabView));
 
                 ctx.slots.inject('main', () => ctx.slots.register({
@@ -153,7 +191,7 @@ window.__ModuleLoader__.load({
                     name: 'sidebar.panellist',
                     id: PANEL_ID,
                     order: 32,
-                    label: '会话全权管家',
+                    label: initialDict.sidebar,
                 }, ManagerIcon));
             },
         };

@@ -1,37 +1,37 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>🗂️ DSH 会话管理与编辑工作台</title>
+  <title>🗂️ DSH Session Manager &amp; In-Place Editor v1.0.3</title>
   <link rel="stylesheet" href="/session-manager/app.css" />
 </head>
 <body>
   <div id="app" class="layout">
-    <!-- 左侧：工作区与会话列表面板 -->
+    <!-- Left Sidebar: Workspace Filter & Session List -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="brand-row">
-          <span class="brand-title">🗂️ DSH 会话管理与编辑工作台</span>
-          <button id="btn-refresh-list" class="btn btn-ghost btn-sm" title="刷新列表">🔄 刷新</button>
+          <span class="brand-title" data-i18n="brandTitle">🗂️ DSH Session Manager</span>
+          <button id="btn-refresh-list" class="btn btn-ghost btn-sm" data-i18n-title="tipRefresh" title="Refresh session list" data-i18n="btnRefresh">🔄 Refresh</button>
         </div>
-        <div id="global-stats" class="stats-bar">正在加载会话数据…</div>
+        <div id="global-stats" class="stats-bar" data-i18n="loadingSessions">Loading sessions…</div>
 
         <div class="filter-group">
-          <input id="search-input" type="search" class="input" placeholder="🔍 搜索会话标题 / ID / 目录…" />
+          <input id="search-input" type="search" class="input" data-i18n-placeholder="phSearch" placeholder="🔍 Search title / ID / directory…" />
           <select id="workspace-filter" class="select">
-            <option value="__all__">📂 全部工作区（含孤儿会话）</option>
+            <option value="__all__">📂 All Sessions</option>
           </select>
         </div>
 
         <div class="batch-bar">
           <label class="checkbox-label">
             <input type="checkbox" id="check-all" />
-            <span>全选当前</span>
+            <span data-i18n="lblSelectAll">Select All</span>
           </label>
           <div class="batch-actions">
-            <button id="btn-clean-empty" class="btn btn-warn btn-xs" title="一键物理清理所有 0 轮空会话">🧹 清空会话</button>
-            <button id="btn-batch-delete" class="btn btn-danger btn-xs" disabled>🗑️ 彻底删除选中 (0)</button>
+            <button id="btn-clean-empty" class="btn btn-warn btn-xs" data-i18n-title="tipCleanEmpty" title="Physically purge all 0-turn empty sessions" data-i18n="btnCleanEmpty">🧹 Purge Empty</button>
+            <button id="btn-batch-delete" class="btn btn-danger btn-xs" disabled>🗑️ Delete Selected (0)</button>
           </div>
         </div>
       </div>
@@ -39,27 +39,38 @@
       <div id="session-list" class="session-list"></div>
     </aside>
 
-    <!-- 右侧：会话内容查看、原地修改与物理文件管理 -->
+    <!-- Right Pane: Persistent Topbar (with Top-Right EN | 中文 | 日本語 Switcher) + Session Editor -->
     <main class="detail-pane">
+      <div class="pane-topbar">
+        <div class="pane-topbar-left">
+          <button id="btn-toggle-sidebar" class="btn btn-ghost btn-xs" data-i18n-title="tipToggleSidebar" title="Show / hide session list" data-i18n="btnToggleSidebar">☰ Sessions</button>
+          <span class="pane-subtitle" data-i18n="paneSubtitle">v1.0.3 · In-Place Zstd Lossless Rewrite &amp; True Physical Storage Cleaner</span>
+        </div>
+        <div class="lang-switcher" role="group" aria-label="Language Switcher">
+          <button type="button" class="lang-btn active" data-lang="en">EN</button>
+          <button type="button" class="lang-btn" data-lang="zh-CN">中文</button>
+          <button type="button" class="lang-btn" data-lang="ja">日本語</button>
+        </div>
+      </div>
+
       <div id="empty-state" class="empty-state">
         <div class="empty-icon">🗂️</div>
-        <h2>选择左侧任意会话即可查看、修改内容或彻底物理删除</h2>
-        <p>支持原地无损修改用户消息、思考链与助手回复（不产生多余副本），删除任意回合，以及连同磁盘 <code>.jsonl.zstd</code>、投影缓存与孤儿附件一并彻底物理删除。</p>
+        <h2 data-i18n="emptyStateTitle">Select any session on the left to inspect, edit in place, or physically delete</h2>
+        <p data-i18n-html="emptyStateDesc">Supports lossless in-place editing of user messages, reasoning/thinking blocks, and assistant replies (zero duplicate session clones), turn trimming, and complete physical removal of <code>.jsonl.zstd</code> logs, projection caches, and orphaned attachments.</p>
       </div>
 
       <div id="session-detail" class="session-detail hidden">
         <header class="detail-header">
           <div class="title-edit-row">
-            <button id="btn-toggle-sidebar" class="btn btn-ghost btn-sm" title="展开/收起左侧列表">☰ 列表</button>
-            <input id="detail-title-input" type="text" class="input title-input" placeholder="输入会话标题…" />
-            <button id="btn-save-title" class="btn btn-primary btn-sm">💾 保存标题</button>
-            <button id="btn-reload-host" class="btn btn-secondary btn-sm" title="通知外层 DSH 刷新页面以同步展示最新修改后的对话">✨ 同步刷新主界面</button>
-            <button id="btn-delete-current" class="btn btn-danger btn-sm">🗑️ 彻底删除此会话及文件</button>
+            <input id="detail-title-input" type="text" class="input title-input" data-i18n-placeholder="phSessionTitle" placeholder="Enter session title…" />
+            <button id="btn-save-title" class="btn btn-primary btn-sm" data-i18n="btnSaveTitle">💾 Save Title</button>
+            <button id="btn-reload-host" class="btn btn-secondary btn-sm" data-i18n-title="tipReloadHost" title="Reload outer DSH view to reflect updated conversation" data-i18n="btnReloadHost">✨ Sync Host UI</button>
+            <button id="btn-delete-current" class="btn btn-danger btn-sm" data-i18n="btnDeleteCurrent">🗑️ Delete Session &amp; Files</button>
           </div>
           <div id="detail-meta" class="detail-meta"></div>
         </header>
 
-        <nav id="turn-nav-bar" class="turn-nav-bar hidden" aria-label="快速定位对话轮次"></nav>
+        <nav id="turn-nav-bar" class="turn-nav-bar hidden" aria-label="Turn Quick Jump"></nav>
 
         <div id="toast-banner" class="toast hidden"></div>
 
@@ -67,16 +78,16 @@
 
         <footer class="append-section">
           <details id="append-details">
-            <summary>➕ 在本会话末尾手动追加一轮对话（原地写入）</summary>
+            <summary data-i18n="appendSummary">➕ Append a Complete Turn at Session End (In-Place Write)</summary>
             <div class="append-form">
-              <label>👤 用户消息内容（User）：</label>
-              <textarea id="append-user" class="textarea" rows="2" placeholder="输入用户侧话语…"></textarea>
-              <label>💭 助手思考块（Reasoning，选填）：</label>
-              <textarea id="append-reasoning" class="textarea" rows="2" placeholder="选填：内部思考内容…"></textarea>
-              <label>🎀 助手正式回复（Assistant）：</label>
-              <textarea id="append-assistant" class="textarea" rows="3" placeholder="输入助手回复正文…"></textarea>
+              <label data-i18n="lblAppendUser">👤 User Message:</label>
+              <textarea id="append-user" class="textarea" rows="2" data-i18n-placeholder="phAppendUser" placeholder="Enter user message…"></textarea>
+              <label data-i18n="lblAppendReasoning">💭 Assistant Reasoning (Optional):</label>
+              <textarea id="append-reasoning" class="textarea" rows="2" data-i18n-placeholder="phAppendReasoning" placeholder="Optional internal reasoning…"></textarea>
+              <label data-i18n="lblAppendAssistant">🤖 Assistant Reply:</label>
+              <textarea id="append-assistant" class="textarea" rows="3" data-i18n-placeholder="phAppendAssistant" placeholder="Enter assistant reply content…"></textarea>
               <div class="append-actions">
-                <button id="btn-append-turn" class="btn btn-primary btn-sm">➕ 立即追加并原地保存</button>
+                <button id="btn-append-turn" class="btn btn-primary btn-sm" data-i18n="btnAppendTurn">➕ Append &amp; Save In Place</button>
               </div>
             </div>
           </details>
@@ -85,14 +96,14 @@
     </main>
   </div>
 
-  <!-- 自定义确认弹窗（避免 iframe sandbox 拦截原生 confirm） -->
+  <!-- Custom Confirmation Modal (iframe sandbox safe) -->
   <div id="modal-backdrop" class="modal-backdrop hidden">
     <div class="modal-card">
-      <h3 id="modal-title">确认操作</h3>
+      <h3 id="modal-title">Confirm Action</h3>
       <p id="modal-message"></p>
       <div class="modal-actions">
-        <button id="modal-cancel" class="btn btn-ghost">取消</button>
-        <button id="modal-confirm" class="btn btn-danger">确认执行</button>
+        <button id="modal-cancel" class="btn btn-ghost" data-i18n="btnCancel">Cancel</button>
+        <button id="modal-confirm" class="btn btn-danger">Confirm</button>
       </div>
     </div>
   </div>

@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   decodeMultiFrameZstd,
   encodeZstdFrameFallback,
@@ -9,6 +12,8 @@ import {
   computeValidInheritedEventCount,
   ensureInheritedCutBeforeAppend,
 } from '../index.mjs';
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 test('multi-frame Zstandard encoder & decoder roundtrip', () => {
   const frame1 = encodeZstdFrameFallback('{"type":"session","version":4,"id":"s1"}\n');
@@ -76,7 +81,6 @@ test('computeValidInheritedEventCount & ensureInheritedCutBeforeAppend preserve 
   assert.equal(trimmed[0].type, 'session/end-seed');
   assert.equal(computeValidInheritedEventCount(seededHeader, 2, trimmed), 0);
 
-  // When a freshly forked session has all events inherited (no end-seed marker yet) and we append:
   const pureSeededEvents = [
     { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
     { type: 'turn/end', seq: 1, time: 2, data: { turn: 1, reason: { kind: 'completed' } } },
@@ -166,4 +170,17 @@ test('buildStructuredConversation normalizes reasoning and thinking blocks acros
   assert.equal(step2Blocks[0].text, 'turn 2 text-field thinking');
   assert.equal(step2Blocks[1].type, 'text');
   assert.equal(step2Blocks[1].text, 'turn 2 final answer');
+});
+
+test('Web UI defaults to English and ships real-time EN | 中文 | 日本語 switcher (v1.0.3)', () => {
+  const pkg = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'));
+  const html = readFileSync(join(REPO_ROOT, 'web', 'index.html'), 'utf8');
+  const appJs = readFileSync(join(REPO_ROOT, 'web', 'app.js'), 'utf8');
+  const clientJs = readFileSync(join(REPO_ROOT, 'client.js'), 'utf8');
+
+  assert.equal(pkg.version, '1.0.3');
+  assert.ok(html.includes('<html lang="en">'));
+  assert.ok(html.includes('data-lang="en"') && html.includes('data-lang="zh-CN"') && html.includes('data-lang="ja"'));
+  assert.ok(appJs.includes('en:') && appJs.includes("'zh-CN':") && appJs.includes('ja:'));
+  assert.ok(clientJs.includes('Session Editor') && clientJs.includes('セッション管理'));
 });
